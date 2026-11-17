@@ -1,0 +1,71 @@
+name: ci-infra
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "infrastructure/**"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  detect-changed-projects:
+    runs-on: ubuntu-latest
+    outputs:
+        matrix: ${{ steps.set-matrix.outputs.matrix }}
+        has_changes: ${{ steps.set-matrix.outputs.has_changes }}
+    steps:
+        - uses: actions/checkout@v7
+          with:
+            fetch-depth: 0 # Get all history, for diffs to detect changes
+
+        - id: set-matrix
+          run: |
+            BASE="${{ github.event.before }}"
+
+            # Get changed files
+            DIRS=$(git diff --name-only "$BASE" "${{ github.sha }}" -- 'infrastructure/' \
+                | xargs -r dirname \
+                | sort -u \
+                | awk '{ if (system("ls " $) "/*.tf >/dev/null 2>&1") == 0) print $0 }' \
+                | jq -R -s -c 'split("\n")[:-1]')
+            
+            echo "matrix=$DIRS" >> "$GITHUB_OUTPUT"
+            if [ "$DIRS" != "[]" ]; then
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            fi
+  terraform-ci:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        working_dir: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.working_dir }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+
+      - name: Format check
+        run: terraform fmt -check
+
+      - name: Validation check
+        run: |
+          terraform init -backend=false
+          terraform validate
+      
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: 'config'
+          scan-ref: ${{ matrix.working_dir }}
+          exit-code: '1'
+          severity: 'HIGH,CRITICAL'
