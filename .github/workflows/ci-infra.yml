@@ -39,13 +39,13 @@ jobs:
               echo "has_changes=false" >> "$GITHUB_OUTPUT"
             fi
   terraform-ci:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.has_changes == 'true'
+    needs: detect-changed-projects
+    if: needs.detect-changed-projects.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        working_dir: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+        working_dir: ${{ fromJson(needs.detect-changed-projects.outputs.matrix) }}
     defaults:
       run:
         working-directory: ${{ matrix.working_dir }}
