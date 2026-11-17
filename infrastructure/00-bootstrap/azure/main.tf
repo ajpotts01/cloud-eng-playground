@@ -67,6 +67,7 @@ resource "azurerm_role_assignment" "sa_github_contributor" {
   principal_id         = azurerm_user_assigned_identity.sa_github.principal_id
 }
 
+# Test comment
 resource "azurerm_role_assignment" "sa_github_rbac" {
   scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
   role_definition_name = "Role Based Access Control Administrator"
