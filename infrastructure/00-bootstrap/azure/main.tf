@@ -6,6 +6,7 @@ resource "azurerm_resource_group" "rg_state" {
   location = var.region
 }
 
+#trivy:ignore:AVD-AZU-0012 - Github runners require public network access. Identity as the perimeter here.
 resource "azurerm_storage_account" "sa_state" {
   name                     = "${replace(var.project_name, "-", "")}tfstate" # Azure storage accounts can't have spaces in their names
   location                 = var.region
